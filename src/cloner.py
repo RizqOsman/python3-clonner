@@ -10,6 +10,7 @@ from .crawler import auto_scroll_lazy, crawl_additional_links
 from .rewriter import rewrite_html_links
 
 async def clone_page(url: str, output_dir: str, full_load: bool, total_timeout_ms: int, headless: bool, crawl_internal=False):
+    """Main function to clone a web page"""
     mkdir(output_dir)
     start_time = time.time()
     end_time = start_time + (total_timeout_ms / 1000)
@@ -18,7 +19,7 @@ async def clone_page(url: str, output_dir: str, full_load: bool, total_timeout_m
         try:
             browser = await pw.chromium.launch(headless=headless, channel="chrome", args=["--no-sandbox"])
         except Exception:
-            print("⚠️ Chrome tidak ditemukan, menggunakan Chromium sebagai gantinya")
+            print("⚠️ Chrome not found, using Chromium instead")
             browser = await pw.chromium.launch(headless=headless, args=["--no-sandbox"])
         
         page = await browser.new_page()
@@ -26,8 +27,8 @@ async def clone_page(url: str, output_dir: str, full_load: bool, total_timeout_m
         handle_response = await create_response_handler(page, output_dir)
         page.on("response", handle_response)
 
-        print(f"⏱ Total waktu capture: {total_timeout_ms} ms ({total_timeout_ms/1000:.0f} detik)")
-        print(f"🌐 Membuka {url}...")
+        print(f"⏱ Total capture time: {total_timeout_ms} ms ({total_timeout_ms/1000:.0f} seconds)")
+        print(f"🌐 Opening {url}...")
 
         wait_mode = "networkidle" if full_load else "domcontentloaded"
         await page.route("**/*", handle_request)
@@ -35,14 +36,14 @@ async def clone_page(url: str, output_dir: str, full_load: bool, total_timeout_m
         await auto_scroll_lazy(page)
         
         if crawl_internal:
-            print("🔍 Mencari dan mengunduh link tambahan...")
+            print("🔍 Searching and downloading additional links...")
             await crawl_additional_links(page, url, output_dir)
         else:
-            print("🚫 Crawling link internal dinonaktifkan")
+            print("🚫 Internal link crawling disabled")
 
         remaining_time = end_time - time.time()
         if remaining_time > 0:
-            print(f"⏱ Menunggu {int(remaining_time)} detik untuk menangkap resource tambahan...")
+            print(f"⏱ Waiting {int(remaining_time)} seconds to capture additional resources...")
             while time.time() < end_time:
                 await asyncio.sleep(1)
 
@@ -64,10 +65,7 @@ async def clone_page(url: str, output_dir: str, full_load: bool, total_timeout_m
 
         with open(html_path, "w", encoding="utf-8") as f:
             f.write(html_content)
-        print(f"📄 HTML disimpan: {html_path}")
-        
-        
-        
+        print(f"📄 HTML saved: {html_path}")
         """
         
         root_index_path = os.path.join(output_dir, "index.html")
@@ -85,10 +83,10 @@ async def clone_page(url: str, output_dir: str, full_load: bool, total_timeout_m
     <p>Redirecting to <a href="{redirect_path}">{parsed_url.netloc}</a>...</p>
 </body>
 </html>")
-        print(f"📄 Index redirect disimpan: {root_index_path}")
+        print(f"📄 Index redirect saved: {root_index_path}")
         """
 
-        print(f"ℹ️ Hanya file HTML utama yang disimpan di folder domain")
+        print(f"ℹ️ Only main HTML file saved in domain folder")
 
-        print("\n✅ Selesai tangkap resource & HTML!")
+        print("\n✅ Resource & HTML capture completed!")
         await browser.close()

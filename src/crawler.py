@@ -2,9 +2,8 @@ import asyncio
 from urllib.parse import urlparse
 from .utils import url_to_local_path
 
-# ===== Auto-scroll helper =====
 async def auto_scroll(page):
-    """Auto scroll untuk memuat konten lazy load"""
+    """Auto scroll to load all content on the page"""
     await page.evaluate("""async () => {
         await new Promise(resolve => {
             let totalHeight = 0;
@@ -21,29 +20,25 @@ async def auto_scroll(page):
         });
     }""")
 
-# ===== Auto-scroll + lazy load capture =====
 async def auto_scroll_lazy(page, delay=0.5, max_scrolls=50):
-    """Scroll otomatis + tangkap lazy request"""
+    """Auto scroll with delay to capture lazy-loaded content"""
     for i in range(max_scrolls):
         await page.evaluate("window.scrollBy(0, window.innerHeight);")
         await asyncio.sleep(delay)
-        # Bisa juga trigger hover atau interaksi tambahan di sini
-        # Misal klik "load more" jika ada
+
         buttons = await page.query_selector_all("button, a")
         for btn in buttons:
             try:
                 text = (await btn.inner_text()).lower()
-                if "load more" in text or "lihat selengkapnya" in text:
+                if "load more" in text or "show more" in text or "view more" in text:
                     await btn.click()
                     await asyncio.sleep(0.5)
             except Exception:
                 continue
 
-# ===== Crawl aset tambahan =====
 async def crawl_additional_links(page, base_url, output_dir):
-    """Mencari dan mengunduh link tambahan yang mungkin terlewat"""
+    """Find and download additional links that may be missed"""
     try:
-        # Dapatkan semua link di halaman
         links = await page.evaluate("""() => {
             const results = [];
             // Collect links from a tags
@@ -59,7 +54,6 @@ async def crawl_additional_links(page, base_url, output_dir):
             return results;
         }""")
         
-        # Filter links (hanya ambil dari domain yang sama atau subdomain)
         base_domain = urlparse(base_url).netloc
         internal_links = []
         
@@ -70,26 +64,25 @@ async def crawl_additional_links(page, base_url, output_dir):
                     continue
                     
                 link_parsed = urlparse(link_url)
-                # Jika domain sama atau subdomain, tambahkan ke daftar
+
                 if link_parsed.netloc == base_domain or link_parsed.netloc.endswith('.' + base_domain):
                     internal_links.append(link_url)
             except Exception as e:
                 print(f"⚠️ Error processing link {item['url']}: {e}")
         
-        print(f"🔍 Menemukan {len(internal_links)} link internal untuk diunduh")
+        print(f"🔍 Found {len(internal_links)} internal links to download")
         
-        # Untuk setiap link internal, cek apakah sudah diunduh, jika belum unduh
         for link in internal_links:
             if link not in url_to_local_path:
                 try:
-                    print(f"⏬ Mengunduh link tambahan: {link}")
-                    # Buka tab baru untuk mengunduh
+                    print(f"⏬ Downloading additional link: {link}")
+
                     new_page = await page.context.new_page()
                     await new_page.goto(link, wait_until="domcontentloaded", timeout=30000)
-                    await asyncio.sleep(1)  # Tunggu sebentar untuk resource di-load
+                    await asyncio.sleep(1)  # Wait briefly for resources to load
                     await new_page.close()
                 except Exception as e:
-                    print(f"⚠️ Error mengunduh link {link}: {e}")
+                    print(f"⚠️ Error downloading link {link}: {e}")
                     
     except Exception as e:
         print(f"⚠️ Error crawling additional links: {e}")

@@ -6,27 +6,24 @@ import base64
 import filetype
 from urllib.parse import urlparse
 
-# Global mapping untuk melacak URL asli ke path lokal
+# Global mapping to track original URLs to local paths
 url_to_local_path = {}
+DATA_URI_REGEX = re.compile(r'data:([a-zA-Z0-9/+\-.]+);base64,([a-zA-Z0-9+/=]+)')
 
-# ===== Path Helper =====
 
 def hash_path(url: str, content_type: str) -> str:
-    """Membuat nama file dari hash URL"""
-    # ambil extension dari content-type
+    """Create a filename from a hash of the URL"""
     ext = mimetypes.guess_extension(content_type.split(";")[0]) or ".bin"
-    # hash URL supaya nama file pendek tapi unik
     h = hashlib.sha1(url.encode()).hexdigest()
     return f"{h}{ext}"
 
-
 def mkdir(path):
-    """Membuat direktori jika belum ada"""
+    """Create directory if it doesn't exist"""
     os.makedirs(path, exist_ok=True)
 
 
 def sanitize_path(url: str, content_type: str) -> str:
-    """Membuat path yang aman dari URL"""
+    """Create a safe path from URL"""
     parsed = urlparse(url.split("#")[0].split("?")[0])
     safe_netloc = re.sub(r"[^a-zA-Z0-9._-]", "_", parsed.netloc)
     safe_path = re.sub(r"[^a-zA-Z0-9._/-]", "_", parsed.path.lstrip("/"))
@@ -45,7 +42,7 @@ def sanitize_path(url: str, content_type: str) -> str:
 
 
 def parse_timeout(value: str) -> int:
-    """Parse timeout string (e.g., '30s', '1m') menjadi milidetik"""
+    """Parse timeout string (e.g., '30s', '1m') into milliseconds"""
     value = str(value).lower().strip()
     if value.endswith("ms"):
         return int(value[:-2])
@@ -56,13 +53,8 @@ def parse_timeout(value: str) -> int:
     else:
         return int(value) * 1000
 
-
-# ===== Ekstraksi Data URI =====
-
-DATA_URI_REGEX = re.compile(r'data:([a-zA-Z0-9/+\-.]+);base64,([a-zA-Z0-9+/=]+)')
-
 def extract_and_replace_data_uri(content: str, base_dir: str, prefix="embedded") -> str:
-    """Ekstrak data URI menjadi file terpisah dan ganti dengan path relatif"""
+    """Extract data URIs into separate files and replace with relative paths"""
     os.makedirs(base_dir, exist_ok=True)
     matches = list(DATA_URI_REGEX.finditer(content))
 
@@ -85,25 +77,19 @@ def extract_and_replace_data_uri(content: str, base_dir: str, prefix="embedded")
     return content
 
 
-# ===== Helper untuk detect ekstensi =====
-
 def detect_extension(url: str, content_type: str, data: bytes) -> str:
-    """Deteksi ekstensi file dari URL, Content-Type, atau magic bytes"""
-    # Cek dari URL dulu
+    """Detect file extension from URL, Content-Type, or magic bytes"""
     ext = os.path.splitext(urlparse(url).path)[1]
     if ext:
         return ext
 
-    # Cek dari Content-Type header
     if content_type:
         guessed = mimetypes.guess_extension(content_type.split(";")[0])
         if guessed:
             return guessed
 
-    # Cek dari magic bytes
     kind = filetype.guess(data)
     if kind:
         return f".{kind.extension}"
 
-    # fallback
     return ".bin"
