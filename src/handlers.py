@@ -108,27 +108,37 @@ async def create_response_handler(page, output_dir):
             
     return handle_response
 
+# Simpan domain/URL yang sudah pernah di-skip biar nggak spam log
+seen_skipped = set()
+
 async def handle_request(route, request):
     """Handle requests and filter out unnecessary ones"""
-    url = request.url
-    
-    # Skip unnecessary files (manifest, tracking, ads)
+    url = request.url.lower()
+
+    # Pola/potongan URL yang mau diabaikan
     skip_patterns = [
-        "manifest.json", 
-        "google-analytics.com", 
-        "analytics.", 
-        "tracker.", 
-        "tracking.", 
-        "adservice.", 
-        "pagead", 
-        "doubleclick.net"
+        "manifest.json",
+        "google-analytics.com",
+        "analytics.",
+        "tracker.",
+        "tracking.",
+        "adservice.",
+        "pagead",
+        "doubleclick.net",
+        "facebook.net",
+        "googletagmanager.com",
+        "mixpanel.com",
+        "hotjar.com"
     ]
-    
+
     for pattern in skip_patterns:
         if pattern in url:
-            print(f"🚫 Skip: {url}")
-            await route.abort()  # Don't fetch
+            # biar nggak spam log, cukup print sekali per domain/pola
+            if pattern not in seen_skipped:
+                print(f"🚫 Skip: {pattern}")
+                seen_skipped.add(pattern)
+            await route.abort()  # blokir request
             return
-            
-    # Continue for all other resources
+
+    # Kalau nggak kena skip → terusin request
     await route.continue_()
